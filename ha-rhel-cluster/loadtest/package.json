@@ -1,0 +1,16 @@
+{
+  "name": "ha-loadtest-reconciler",
+  "version": "1.0.0",
+  "description": "High-Throughput VRRP Failover Load Tester and Exactly-Once Transaction Reconciler",
+  "main": "loadtest.js",
+  "scripts": {
+    "start": "node loadtest.js",
+    "reconcile": "node reconcile.js",
+    "test": "node test-loadtest.js"
+  },
+  "dependencies": {
+    "pg": "^8.11.5",
+    "undici": "^6.19.8",
+    "uuid": "^9.0.1"
+  }
+}
