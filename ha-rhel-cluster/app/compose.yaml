@@ -1,0 +1,83 @@
+# ==============================================================================
+# ha-rhel-cluster/app/compose.yaml
+# Production Application Tier: PostgreSQL 16 + 2x Express API Replicas
+# Podman Compose with strict SELinux :Z volume labeling
+# ==============================================================================
+
+version: "3.8"
+
+networks:
+  app_net:
+    driver: bridge
+
+volumes:
+  pg_data:
+    driver: local
+
+services:
+  postgres:
+    image: docker.io/library/postgres:16-alpine
+    container_name: app-postgres
+    restart: always
+    environment:
+      POSTGRES_DB: transactions_db
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: TxSecurePass2026!
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      # :Z tells SELinux to relabel the volume so rootless/podman containers can write
+      - pg_data:/var/lib/postgresql/data:Z
+      - ../db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro,Z
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d transactions_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  api1:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/ha-api:latest
+    container_name: app-api-1
+    restart: always
+    ports:
+      - "8081:3000"
+    environment:
+      PORT: "3000"
+      BACKEND_NAME: "api-replica-1"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "app_user"
+      DB_PASSWORD: "TxSecurePass2026!"
+      DB_NAME: "transactions_db"
+    networks:
+      - app_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api2:
+    image: localhost/ha-api:latest
+    container_name: app-api-2
+    restart: always
+    ports:
+      - "8082:3000"
+    environment:
+      PORT: "3000"
+      BACKEND_NAME: "api-replica-2"
+      DB_HOST: "postgres"
+      DB_PORT: "5432"
+      DB_USER: "app_user"
+      DB_PASSWORD: "TxSecurePass2026!"
+      DB_NAME: "transactions_db"
+    networks:
+      - app_net
+    depends_on:
+      postgres:
+        condition: service_healthy

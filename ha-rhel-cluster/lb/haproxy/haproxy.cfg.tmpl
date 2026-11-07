@@ -1,0 +1,87 @@
+# ==============================================================================
+# ha-rhel-cluster/lb/haproxy/haproxy.cfg.tmpl
+# Production HAProxy 2.x/3.x Configuration Template for High-Availability Cluster
+# Binds to Floating VIP and local node IP (requires ip_nonlocal_bind=1)
+# ==============================================================================
+
+global
+    log         127.0.0.1 local2 info
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+
+    # Unix domain socket for CLI management and health status inspection
+    stats socket /var/lib/haproxy/stats mode 660 level admin expose-fd listeners
+    stats timeout 30s
+
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option                  http-server-close
+    option forwardfor       except 127.0.0.0/8
+    option                  redispatch
+    retries                 3
+    timeout http-request    5s
+    timeout queue           5s
+    timeout connect         500ms
+    timeout client          10s
+    timeout server          10s
+    timeout http-keep-alive 5s
+    timeout check           2s
+    maxconn                 4000
+
+# ------------------------------------------------------------------------------
+# FRONTEND: Ingress API (Listens on VIP and Node IP)
+# ------------------------------------------------------------------------------
+frontend api_front
+    # Binds to the floating VIP (enabled via net.ipv4.ip_nonlocal_bind=1)
+    bind __VIP__:__VIP_PORT__ name vip
+
+    # Binds to local node IP for independent health checks prior to Keepalived
+    bind __NODE_IP__:__VIP_PORT__ name node_local
+
+    # Inject header identifying which physical LB node terminated the TCP connection
+    http-response set-header X-LB-Node __LB_NODE_NAME__
+
+    # Route all traffic to the API backend cluster
+    default_backend api_back
+
+# ------------------------------------------------------------------------------
+# BACKEND: API Application Pool (app1 replicas)
+# ------------------------------------------------------------------------------
+backend api_back
+    mode        http
+    balance     roundrobin
+
+    # Active HTTP health check against /health endpoint
+    option httpchk GET /health
+    http-check expect status 200
+
+    # Fast failure detection: check every 1500ms, mark dead after 2 missed, up after 2 ok
+    default-server check inter 1500ms rise 2 fall 2
+
+    server app1_replica1 __APP1_IP__:__APP_PORT_1__ check
+    server app1_replica2 __APP1_IP__:__APP_PORT_2__ check
+
+# ------------------------------------------------------------------------------
+# STATS & PROMETHEUS METRICS FRONTEND
+# ------------------------------------------------------------------------------
+frontend stats_and_metrics
+    bind *:__HAPROXY_STATS_PORT__
+    mode http
+
+    # Prometheus exporter service endpoint
+    http-request use-service prometheus-exporter if { path /metrics }
+
+    # Human-readable administration stats dashboard
+    stats enable
+    stats uri /stats
+    stats refresh 3s
+    stats show-legends
+    stats auth __HAPROXY_STATS_USER__:__HAPROXY_STATS_PASS__
+    stats admin if TRUE
