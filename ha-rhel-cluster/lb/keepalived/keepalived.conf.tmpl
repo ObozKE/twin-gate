@@ -1,0 +1,62 @@
+# ==============================================================================
+# ha-rhel-cluster/lb/keepalived/keepalived.conf.tmpl
+# Production Keepalived 2.x Configuration for Sub-2-Second Failover
+# Implements RFC 5798 VRRPv3, Aggressive GARP bursts, and HAProxy Health Tracking
+# ==============================================================================
+
+global_defs {
+    router_id __LB_HOSTNAME__
+
+    # RHEL 9 Security: Permit external script execution under root privilege
+    enable_script_security
+    script_user root
+
+    # VRRPv3 Specification (RFC 5798) for sub-second timers
+    vrrp_version 3
+
+    # Gratuitous ARP (GARP) Tuning
+    # Broadcasts unsolicited ARPs immediately on becoming MASTER to flush VMware vSwitch & host ARP tables
+    vrrp_garp_master_delay 1
+    vrrp_garp_master_repeat 5
+    vrrp_garp_master_refresh 5
+    vrrp_garp_master_refresh_repeat 2
+}
+
+# ------------------------------------------------------------------------------
+# Health Check Tracking Script
+# ------------------------------------------------------------------------------
+vrrp_script chk_haproxy {
+    script "/usr/local/bin/check_haproxy.sh"
+    interval 1          # Check every 1 second
+    timeout 1           # 1-second execution timeout
+    weight -60          # On failure: lb1 priority drops from 150 -> 90 (< lb2 priority 100)
+    fall 2              # 2 consecutive failures triggers priority reduction
+    rise 2              # 2 consecutive successes restores priority
+    user root
+}
+
+# ------------------------------------------------------------------------------
+# VRRP Instance: Floating VIP Management
+# ------------------------------------------------------------------------------
+vrrp_instance VI_1 {
+    state __VRRP_INITIAL_STATE__
+    interface __VIP_IFACE__
+    virtual_router_id __VRRP_ROUTER_ID__
+    priority __VRRP_PRIORITY__
+    advert_int __VRRP_ADVERT_INT__
+
+    # Prevent flap / bounce back when lb1 recovers (production carrier-grade standard)
+    __NOPREEMPT_DIRECTIVE__
+
+    track_script {
+        chk_haproxy
+    }
+
+    # Floating Virtual IP assigned to active MASTER
+    virtual_ipaddress {
+        __VIP__/24 dev __VIP_IFACE__
+    }
+
+    # Script invoked on MASTER / BACKUP / FAULT transitions
+    notify "/usr/local/bin/notify.sh"
+}
