@@ -1,0 +1,58 @@
+# ==============================================================================
+# ha-rhel-cluster/monitoring/compose.yaml
+# Production Observability Stack: Prometheus + Grafana (Podman Compose)
+# Fully provisioned with datasources, dashboards, and SELinux :Z labeling
+# ==============================================================================
+
+version: "3.8"
+
+networks:
+  mon_net:
+    driver: bridge
+
+volumes:
+  prom_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+services:
+  prometheus:
+    image: docker.io/prom/prometheus:v2.52.0
+    container_name: mon-prometheus
+    restart: always
+    ports:
+      - "9090:9090"
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
+      - ./prometheus/alert.rules.yml:/etc/prometheus/alert.rules.yml:ro,Z
+      - prom_data:/prometheus:Z
+    networks:
+      - mon_net
+
+  grafana:
+    image: docker.io/grafana/grafana:11.0.0
+    container_name: mon-grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: SreLab2026!
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/provisioning/dashboards/json/ha-cluster-overview.json
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro,Z
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro,Z
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro,Z
+      - grafana_data:/var/lib/grafana:Z
+    networks:
+      - mon_net
+    depends_on:
+      - prometheus

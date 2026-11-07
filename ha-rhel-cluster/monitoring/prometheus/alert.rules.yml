@@ -1,0 +1,71 @@
+# ==============================================================================
+# ha-rhel-cluster/monitoring/prometheus/alert.rules.yml
+# Production Alerting Rules for HA Cluster & VRRP Split-Brain Detection
+# ==============================================================================
+
+groups:
+  - name: cluster_failover_alerts
+    rules:
+      # ------------------------------------------------------------------------
+      # 1. Critical: Split-Brain Condition (Both Nodes Claim MASTER)
+      # ------------------------------------------------------------------------
+      - alert: VRRPSplitBrain
+        expr: sum(keepalived_vrrp_is_master) > 1
+        for: 1s
+        labels:
+          severity: critical
+          tier: ingress
+        annotations:
+          summary: "VRRP Split-Brain condition detected!"
+          description: "Both lb1 and lb2 are concurrently asserting MASTER state and binding the floating VIP 192.168.56.10. Immediate L2 multicast / firewalld partition."
+
+      # ------------------------------------------------------------------------
+      # 2. Critical: Orphaned VIP (No Node is MASTER)
+      # ------------------------------------------------------------------------
+      - alert: VRRPNoMaster
+        expr: sum(keepalived_vrrp_is_master) == 0
+        for: 2s
+        labels:
+          severity: critical
+          tier: ingress
+        annotations:
+          summary: "No active VRRP MASTER in cluster!"
+          description: "Neither load balancer node currently owns the floating VIP. Ingress traffic is blackholed."
+
+      # ------------------------------------------------------------------------
+      # 3. Informational: State Change Event (Used for Annotations)
+      # ------------------------------------------------------------------------
+      - alert: VRRPStateChange
+        expr: changes(keepalived_vrrp_is_master[30s]) > 0
+        labels:
+          severity: info
+          tier: ingress
+        annotations:
+          summary: "VRRP VIP mastership transition occurred"
+          description: "The floating VIP has moved between cluster load balancer nodes."
+
+      # ------------------------------------------------------------------------
+      # 4. Critical: HAProxy Backend Server Down
+      # ------------------------------------------------------------------------
+      - alert: HAProxyBackendServerDown
+        expr: haproxy_server_status{proxy="api_back"} == 0
+        for: 2s
+        labels:
+          severity: critical
+          tier: application
+        annotations:
+          summary: "HAProxy backend API instance is DOWN"
+          description: "Backend server {{ $labels.server }} in pool {{ $labels.proxy }} failed health check."
+
+      # ------------------------------------------------------------------------
+      # 5. Warning: Node Exporter Target Down
+      # ------------------------------------------------------------------------
+      - alert: ClusterNodeDown
+        expr: up{job="node_exporter"} == 0
+        for: 2s
+        labels:
+          severity: warning
+          tier: infrastructure
+        annotations:
+          summary: "Cluster VM {{ $labels.instance_node }} is unreachable"
+          description: "Prometheus cannot scrape node_exporter on {{ $labels.instance_node }}."

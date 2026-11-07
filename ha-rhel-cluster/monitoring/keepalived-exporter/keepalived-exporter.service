@@ -1,0 +1,16 @@
+[Unit]
+Description=Keepalived VRRP Prometheus Exporter
+After=network.target keepalived.service
+Wants=keepalived.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/node /usr/local/bin/keepalived-exporter.js
+Restart=always
+RestartSec=3
+Environment=PORT=9650
+Environment=VIP=192.168.56.10
+
+[Install]
+WantedBy=multi-user.target

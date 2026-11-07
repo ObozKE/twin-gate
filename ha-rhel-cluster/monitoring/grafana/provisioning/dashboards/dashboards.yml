@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: "HA Cluster Dashboards"
+    orgId: 1
+    folder: "Production Clusters"
+    type: file
+    disableDeletion: true
+    editable: true
+    updateIntervalSeconds: 5
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json
