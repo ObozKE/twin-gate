@@ -12,6 +12,9 @@ if [[ -n "${__ENV_SH_LOADED:-}" ]]; then
 fi
 export __ENV_SH_LOADED=1
 
+# Enforce strict Bash mode if executed directly or in non-interactive subshell
+[[ $- == *i* ]] || set -euo pipefail
+
 # ------------------------------------------------------------------------------
 # 1. NETWORK TOPOLOGY (VMnet Dedicated Subnet: 192.168.56.0/24)
 # ------------------------------------------------------------------------------

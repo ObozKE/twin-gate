@@ -1,0 +1,26 @@
+{
+  "target_url": "http://127.0.0.1:3085/transactions",
+  "configured_rate_rps": 50,
+  "duration_seconds": 8,
+  "total_transactions_scheduled": 251,
+  "total_confirmed_success": 240,
+  "total_permanent_failures": 11,
+  "raw_attempts_total": 459,
+  "retry_attempts_total": 208,
+  "success_rate_percent": "95.62",
+  "latencies_ms": {
+    "p50": "4.0",
+    "p95": "865.0",
+    "p99": "878.0"
+  },
+  "failover_metrics": {
+    "initial_active_node": "lb1",
+    "failover_detected_node": "lb2",
+    "first_failure_time": "2026-11-07T19:00:05.486Z",
+    "recovery_time": "2026-11-07T19:00:06.567Z",
+    "measured_failover_window_ms": 1081,
+    "measured_failover_window_seconds": "1.081"
+  },
+  "csv_file": "C:\\Users\\Admin\\Desktop\\projectmax\\twingate\\ha-rhel-cluster\\loadtest\\results\\run-2026-11-07T19-00-03-731Z.csv",
+  "confirmed_uuids_file": "C:\\Users\\Admin\\Desktop\\projectmax\\twingate\\ha-rhel-cluster\\loadtest\\results\\confirmed-uuids-2026-11-07T19-00-03-731Z.txt"
+}
