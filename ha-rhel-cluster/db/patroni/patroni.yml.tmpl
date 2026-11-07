@@ -1,0 +1,67 @@
+# ==============================================================================
+# ha-rhel-cluster/db/patroni/patroni.yml.tmpl
+# Production Patroni HA Template for PostgreSQL 16 & etcd Consensus
+# Enforces Zero Data Loss with Synchronous Replication and Automatic Failover
+# ==============================================================================
+
+scope: __PATRONI_CLUSTER_NAME__
+namespace: /service
+name: __PATRONI_NODE_NAME__
+
+restapi:
+  listen: 0.0.0.0:__PATRONI_API_PORT__
+  connect_address: __NODE_IP__:__PATRONI_API_PORT__
+
+etcd3:
+  hosts:
+    - 192.168.56.20:2379
+    - 192.168.56.21:2379
+    - 192.168.56.30:2379
+
+bootstrap:
+  dcs:
+    ttl: 10
+    loop_wait: 2
+    retry_timeout: 5
+    maximum_lag_on_failover: 1048576
+    synchronous_mode: true
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        max_wal_senders: 10
+        max_replication_slots: 10
+        hot_standby: "on"
+        archive_mode: "on"
+        archive_command: "true"
+        shared_buffers: 256MB
+        max_connections: 100
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+
+  pg_hba:
+    - host replication __DB_REPLICATION_USER__ 192.168.56.0/24 md5
+    - host all all 192.168.56.0/24 md5
+    - host all all 127.0.0.1/32 md5
+
+postgresql:
+  listen: 0.0.0.0:__DB_PORT__
+  connect_address: __NODE_IP__:__DB_PORT__
+  data_dir: /var/lib/postgresql/data/pgdata
+  bin_dir: /usr/pgsql-16/bin
+  pgpass: /var/lib/postgresql/.pgpass
+  authentication:
+    replication:
+      username: __DB_REPLICATION_USER__
+      password: __DB_REPLICATION_PASS__
+    superuser:
+      username: postgres
+      password: __DB_PASS__
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  nosync: false

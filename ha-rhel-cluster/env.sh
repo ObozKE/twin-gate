@@ -36,11 +36,14 @@ export LB2_HOSTNAME="lb2.corp.internal"
 export APP1_IP="192.168.56.20"
 export APP1_HOSTNAME="app1.corp.internal"
 
+# Stage 8: Redundant Application & Database Secondary Node
+export APP2_IP="192.168.56.21"
+export APP2_HOSTNAME="app2.corp.internal"
+
 export MON1_IP="192.168.56.30"
 export MON1_HOSTNAME="mon1.corp.internal"
 
 # Dynamic Network Interface Auto-Detection with ens33 Fallback
-# Ensures compatibility regardless of whether VMware names the NIC ens33, ens160, or eth0
 DETECTED_IFACE=$(ip -4 route show default 2>/dev/null | awk '{print $5}' | head -n1 || true)
 if [[ -z "${DETECTED_IFACE}" ]]; then
   DETECTED_IFACE=$(ip -4 addr show | grep -E 'inet 192\.168\.56\.' | awk '{print $NF}' | head -n1 || true)
@@ -54,9 +57,9 @@ export VRRP_ROUTER_ID=56                   # Virtual Router Identifier (VRID 1-2
 export VRRP_ADVERT_INT="0.3"               # Advertisement interval: 0.3s (300ms)
 export VRRP_PRIORITY_MASTER=150            # lb1 priority
 export VRRP_PRIORITY_BACKUP=100            # lb2 priority
-export VRRP_AUTH_PASS="VrrpSecPass2026!"   # VRRP authentication password (max 8 chars in standard VRRPv2; plain text in v3)
+export VRRP_AUTH_PASS="VrrpSecPass2026!"   # VRRP authentication password
 
-# Gratuitous ARP burst parameters to flush VMware virtual switch & host ARP tables
+# Gratuitous ARP burst parameters
 export GARP_MASTER_DELAY=1
 export GARP_MASTER_REPEAT=5
 export GARP_MASTER_REFRESH=5
@@ -70,9 +73,11 @@ export HAPROXY_STATS_PORT=8404
 export HAPROXY_STATS_USER="admin"
 export HAPROXY_STATS_PASS="SreLab2026!"
 export HAPROXY_METRICS_PORT=8405
+export HAPROXY_PG_WRITE_PORT=5000          # HAProxy routed write port to Patroni primary
+export HAPROXY_PG_READ_PORT=5001           # HAProxy routed read port to standby replicas
 
 # ------------------------------------------------------------------------------
-# 4. APPLICATION & DATABASE CONFIGURATION (app1)
+# 4. APPLICATION & DATABASE CONFIGURATION (app1 & app2)
 # ------------------------------------------------------------------------------
 export APP_PORT_1=8081                     # Express API Replica 1
 export APP_PORT_2=8082                     # Express API Replica 2
@@ -83,7 +88,15 @@ export DB_PORT=5432
 export DB_NAME="transactions_db"
 export DB_USER="app_user"
 export DB_PASS="TxSecurePass2026!"
-export DB_DATA_DIR="/var/lib/containers/storage/volumes/pg_data/_data"
+export DB_REPLICATION_USER="replicator"
+export DB_REPLICATION_PASS="ReplSecure2026!"
+
+# Stage 8: Patroni & etcd Consensus Parameters
+export PATRONI_API_PORT=8008
+export PATRONI_CLUSTER_NAME="ha-pg-cluster"
+export ETCD_PORT=2379
+export ETCD_PEER_PORT=2380
+export ETCD_INITIAL_CLUSTER="etcd1=http://192.168.56.20:2380,etcd2=http://192.168.56.21:2380,etcd3=http://192.168.56.30:2380"
 
 # ------------------------------------------------------------------------------
 # 5. OBSERVABILITY CONFIGURATION (mon1)
@@ -98,5 +111,4 @@ export GRAFANA_ADMIN_PASS="SreLab2026!"
 # ------------------------------------------------------------------------------
 # 6. TIME SYNCHRONIZATION (Chrony NTP)
 # ------------------------------------------------------------------------------
-# Critical for sub-second log correlation across lb1, lb2, app1, and mon1
 export NTP_SERVERS="pool.ntp.org 0.rhel.pool.ntp.org 1.rhel.pool.ntp.org"
